@@ -1,0 +1,215 @@
+﻿<UserControl x:Class="CRM_lourd.Views.ClientsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="750" d:DesignWidth="1200"
+             FontFamily="Segoe UI">
+
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="PrimaryColor" Color="#2563EB"/>
+        <SolidColorBrush x:Key="PrimaryHover" Color="#1D4ED8"/>
+        <SolidColorBrush x:Key="DangerColor" Color="#EF4444"/>
+        <SolidColorBrush x:Key="BackgroundColor" Color="#F3F4F6"/>
+        <SolidColorBrush x:Key="SurfaceColor" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="TextPrimary" Color="#111827"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#6B7280"/>
+        <SolidColorBrush x:Key="BorderColor" Color="#E5E7EB"/>
+
+        <!-- Styles (Gardés identiques pour la cohérence) -->
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{StaticResource SurfaceColor}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" CornerRadius="6" Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="false"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryColor}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="InputLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="{StaticResource BackgroundColor}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- En-tête -->
+        <Border Background="{StaticResource SurfaceColor}" Padding="30,20" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Gestion des Clients &amp; Prospects" 
+                           FontSize="24" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="30">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="380"/>
+                <!-- Agrandi pour contenir plus d'infos -->
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- FORMULAIRE (Gauche) -->
+            <Border Grid.Column="0" Background="{StaticResource SurfaceColor}" CornerRadius="12" Margin="0,0,20,0" VerticalAlignment="Top">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="600">
+                    <Grid Margin="25">
+                        <StackPanel>
+                            <TextBlock Text="Fiche Client" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,20"/>
+
+                            <!-- STATUT (Important pour la Mission !) -->
+                            <StackPanel Margin="0,0,0,15">
+                                <TextBlock Text="Statut du dossier" Style="{StaticResource InputLabel}"/>
+                                <ComboBox x:Name="cbStatus" Padding="10,8" FontSize="14" Background="White" BorderBrush="{StaticResource BorderColor}">
+                                    <ComboBoxItem Content="prospect" IsSelected="True"/>
+                                    <ComboBoxItem Content="actif"/>
+                                    <ComboBoxItem Content="inactif"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Identité -->
+                            <StackPanel Margin="0,0,0,15">
+                                <TextBlock Text="Nom complet" Style="{StaticResource InputLabel}"/>
+                                <TextBox x:Name="txtCustomerName" Style="{StaticResource ModernTextBox}"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,0,0,15">
+                                <TextBlock Text="Entreprise (Optionnel)" Style="{StaticResource InputLabel}"/>
+                                <TextBox x:Name="txtCompany" Style="{StaticResource ModernTextBox}"/>
+                            </StackPanel>
+
+                            <!-- Contact -->
+                            <Grid Margin="0,0,0,15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Email" Style="{StaticResource InputLabel}"/>
+                                    <TextBox x:Name="txtCustomerEmail" Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Téléphone" Style="{StaticResource InputLabel}"/>
+                                    <TextBox x:Name="txtCustomerPhone" Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Adresse -->
+                            <StackPanel Margin="0,0,0,15">
+                                <TextBlock Text="Adresse" Style="{StaticResource InputLabel}"/>
+                                <TextBox x:Name="txtAddress" Style="{StaticResource ModernTextBox}"/>
+                            </StackPanel>
+
+                            <Grid Margin="0,0,0,25">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="0.7*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Code Postal" Style="{StaticResource InputLabel}"/>
+                                    <TextBox x:Name="txtZip" Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Ville" Style="{StaticResource InputLabel}"/>
+                                    <TextBox x:Name="txtCity" Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Boutons Actions -->
+                            <StackPanel>
+                                <Button Content="Ajouter" Click="btnAddCustomer_Click" Style="{StaticResource ActionButton}" Margin="0,0,0,10"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="Modifier" Click="btnUpdateCustomer_Click" Background="Transparent" Foreground="{StaticResource PrimaryColor}" BorderBrush="{StaticResource PrimaryColor}" BorderThickness="1" Padding="10"/>
+                                    <Button Grid.Column="2" Content="Supprimer" Click="btnDeleteCustomer_Click" Background="#FEE2E2" Foreground="{StaticResource DangerColor}" BorderThickness="0" Padding="10"/>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+            </Border>
+
+            <!-- LISTE (Droite) -->
+            <Border Grid.Column="1" Background="{StaticResource SurfaceColor}" CornerRadius="12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Margin="20" Height="40">
+                        <TextBlock Text="Répertoire" VerticalAlignment="Center" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
+                    </Grid>
+
+                    <DataGrid x:Name="dgCustomers" Grid.Row="1" 
+                              AutoGenerateColumns="False" 
+                              CanUserAddRows="False" 
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              SelectionChanged="dgCustomers_SelectionChanged"
+                              GridLinesVisibility="Horizontal"
+                              RowHeight="40" Background="White" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderColor}">
+
+                        <DataGrid.Columns>
+                            <!-- Pastille de couleur selon le statut -->
+                            <DataGridTemplateColumn Header="STATUT" Width="80">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="4" Padding="5,2" Background="#EFF6FF" HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding Status}" Foreground="#2563EB" FontSize="12" FontWeight="SemiBold"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="NOM" Binding="{Binding Name}" Width="1.5*" FontWeight="Medium"/>
+                            <DataGridTextColumn Header="ENTREPRISE" Binding="{Binding CompanyName}" Width="*"/>
+                            <DataGridTextColumn Header="EMAIL" Binding="{Binding Email}" Width="1.5*"/>
+                            <DataGridTextColumn Header="VILLE" Binding="{Binding City}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

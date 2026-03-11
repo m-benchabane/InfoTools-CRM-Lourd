@@ -1,0 +1,148 @@
+﻿<Window x:Class="CRM_lourd.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Connexion" Height="480" Width="620"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize" WindowStyle="None"
+        Background="Transparent" AllowsTransparency="True" FontFamily="Segoe UI">
+
+    <Border CornerRadius="16" Background="White" BorderBrush="#E2E8F0" BorderThickness="1" ClipToBounds="True">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="40" Opacity="0.18" ShadowDepth="0" Color="#0E2337"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="7"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Accent vertical bleu -->
+
+            <!-- Contenu principal -->
+            <StackPanel Grid.Column="1" Margin="48,44,48,44" VerticalAlignment="Center">
+
+                <!-- Logo / Titre -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,6">
+                    <Border Width="36" Height="36" CornerRadius="8" Margin="0,0,10,0" VerticalAlignment="Center">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#2563EB" Offset="0"/>
+                                <GradientStop Color="#1D4ED8" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <TextBlock Text="C" FontSize="20" FontWeight="Bold" Foreground="White"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="CRM Pro" FontSize="26" FontWeight="Bold" Foreground="#0E2337"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <TextBlock Text="Connectez-vous à votre espace" FontSize="13" Foreground="#94A3B8"
+                           HorizontalAlignment="Center" Margin="0,0,0,32"/>
+
+                <!-- Champ Utilisateur -->
+                <TextBlock Text="IDENTIFIANT" FontSize="10.5" FontWeight="SemiBold"
+                           Foreground="#64748B" Margin="0,0,0,6"/>
+                <Border BorderBrush="#E2E8F0" BorderThickness="1.5" CornerRadius="8" Margin="0,0,0,4">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="BorderBrush" Value="#2563EB"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="&#xE77B;" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="15" Foreground="#94A3B8"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBox x:Name="txtUser" Grid.Column="1" Padding="0,12,12,12"
+                                 FontSize="14" BorderThickness="0" Background="Transparent"
+                                 Foreground="#0E2337" VerticalContentAlignment="Center"
+                                 CaretBrush="#2563EB"/>
+                    </Grid>
+                </Border>
+
+                <!-- Champ Mot de passe -->
+                <TextBlock Text="MOT DE PASSE" FontSize="10.5" FontWeight="SemiBold"
+                           Foreground="#64748B" Margin="0,18,0,6"/>
+                <Border BorderBrush="#E2E8F0" BorderThickness="1.5" CornerRadius="8" Margin="0,0,0,4">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="BorderBrush" Value="#2563EB"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="&#xE72E;" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="15" Foreground="#94A3B8"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <PasswordBox x:Name="txtPass" Grid.Column="1" Padding="0,12,12,12"
+                                     FontSize="14" BorderThickness="0" Background="Transparent"
+                                     Foreground="#0E2337" VerticalContentAlignment="Center"
+                                     CaretBrush="#2563EB"/>
+                    </Grid>
+                </Border>
+
+                <!-- Bouton Connexion -->
+                <Button Content="Se connecter →" Click="BtnLogin_Click"
+                        Margin="0,28,0,0" Height="48" Cursor="Hand"
+                        BorderThickness="0" FontSize="14" FontWeight="SemiBold" Foreground="White">
+                    <Button.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#2563EB" Offset="0"/>
+                            <GradientStop Color="#1D4ED8" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Button.Background>
+                    <Button.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="8"/>
+                        </Style>
+                    </Button.Resources>
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Opacity" Value="0.9"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Opacity" Value="0.8"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Bouton Annuler -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                    <Button Content="Annuler" Click="BtnExit_Click"
+                            Background="Transparent" Foreground="#94A3B8"
+                            BorderThickness="0" Cursor="Hand" FontSize="12">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Foreground" Value="#EF4444"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
