@@ -1,6 +1,7 @@
 ﻿using MySql.Data.MySqlClient;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -58,6 +59,15 @@ namespace CRM_lourd.Views
                 cmd.Parameters.AddWithValue("@price", price);
                 cmd.ExecuteNonQuery();
 
+                long newId = cmd.LastInsertedId;
+
+                var log = new
+                {
+                    avant = (object)null,
+                    apres = new { nom = name, stock = stock, prix = price }
+                };
+                AuditService.AddLog("INSERT", "products", newId, JsonSerializer.Serialize(log));
+
                 MessageBox.Show("Produit ajouté !");
                 LoadProducts();
             }
@@ -83,6 +93,13 @@ namespace CRM_lourd.Views
                 cmd.Parameters.AddWithValue("@id", selected.Id);
                 cmd.ExecuteNonQuery();
 
+                var log = new
+                {
+                    avant = new { nom = selected.Name, stock = selected.Stock, prix = selected.Price },
+                    apres = new { nom = txtProductName.Text, stock = stock, prix = price }
+                };
+                AuditService.AddLog("UPDATE", "products", (long)selected.Id, JsonSerializer.Serialize(log));
+
                 MessageBox.Show("Produit mis à jour !");
                 LoadProducts();
             }
@@ -102,6 +119,13 @@ namespace CRM_lourd.Views
                     MySqlCommand cmd = new MySqlCommand("DELETE FROM products WHERE id=@id", conn);
                     cmd.Parameters.AddWithValue("@id", selected.Id);
                     cmd.ExecuteNonQuery();
+
+                    var log = new
+                    {
+                        avant = new { nom = selected.Name, stock = selected.Stock, prix = selected.Price },
+                        apres = (object)null
+                    };
+                    AuditService.AddLog("DELETE", "products", (long)selected.Id, JsonSerializer.Serialize(log));
 
                     MessageBox.Show("Produit supprimé !");
                     LoadProducts();

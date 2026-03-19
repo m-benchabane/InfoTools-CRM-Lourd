@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -12,6 +13,8 @@ namespace CRM_lourd.Views
     {
         private ObservableCollection<Invoice_lines> _basket = new ObservableCollection<Invoice_lines>();
         private long? _selectedInvoiceId = null;
+        private decimal _oldTotal = 0;
+        private string _oldClientName = "";
 
         public InvoicesView()
         {
@@ -32,7 +35,6 @@ namespace CRM_lourd.Views
             Database db = new Database();
             using (var conn = db.GetConnection())
             {
-                // Uniquement les clients actifs — pas de facture pour les prospects
                 var r = new MySqlCommand("SELECT id, name FROM customers WHERE status = 'actif'", conn).ExecuteReader();
                 while (r.Read()) list.Add(new Client { Id = r.GetInt64(0), Name = r.GetString(1) });
             }
@@ -91,6 +93,8 @@ namespace CRM_lourd.Views
             if (dgInvoices.SelectedItem is Invoice inv)
             {
                 _selectedInvoiceId = inv.Id;
+                _oldTotal = inv.Total;
+                _oldClientName = (cbClients.SelectedItem as Client)?.Name ?? "";
                 dpInvoiceDate.SelectedDate = inv.InvoicedAt;
 
                 _basket.Clear();
@@ -134,7 +138,7 @@ namespace CRM_lourd.Views
             Database db = new Database();
             using (var conn = db.GetConnection())
             {
-                decimal total = _basket.Sum(x => x.LineTotal);
+                decimal newTotal = _basket.Sum(x => x.LineTotal);
                 long id;
 
                 if (existingId == null)
@@ -142,9 +146,22 @@ namespace CRM_lourd.Views
                     var cmd = new MySqlCommand("INSERT INTO invoices (customer_id, invoiced_at, total, reference) VALUES (@cid, @date, @total, @ref); SELECT LAST_INSERT_ID();", conn);
                     cmd.Parameters.AddWithValue("@cid", c.Id);
                     cmd.Parameters.AddWithValue("@date", dpInvoiceDate.SelectedDate ?? DateTime.Now);
-                    cmd.Parameters.AddWithValue("@total", total);
+                    cmd.Parameters.AddWithValue("@total", newTotal);
                     cmd.Parameters.AddWithValue("@ref", "INV-" + DateTime.Now.Ticks.ToString().Substring(10));
                     id = Convert.ToInt64(cmd.ExecuteScalar());
+
+                    var log = new
+                    {
+                        avant = (object)null,
+                        apres = new
+                        {
+                            client = c.Name,
+                            date = (dpInvoiceDate.SelectedDate ?? DateTime.Now).ToString("dd/MM/yyyy"),
+                            total = newTotal,
+                            nb_lignes = _basket.Count
+                        }
+                    };
+                    AuditService.AddLog("INSERT", "invoices", id, JsonSerializer.Serialize(log));
                 }
                 else
                 {
@@ -152,10 +169,17 @@ namespace CRM_lourd.Views
                     var cmd = new MySqlCommand("UPDATE invoices SET customer_id=@cid, invoiced_at=@date, total=@total WHERE id=@id", conn);
                     cmd.Parameters.AddWithValue("@cid", c.Id);
                     cmd.Parameters.AddWithValue("@date", dpInvoiceDate.SelectedDate);
-                    cmd.Parameters.AddWithValue("@total", total);
+                    cmd.Parameters.AddWithValue("@total", newTotal);
                     cmd.Parameters.AddWithValue("@id", id);
                     cmd.ExecuteNonQuery();
                     new MySqlCommand($"DELETE FROM invoice_lines WHERE invoice_id={id}", conn).ExecuteNonQuery();
+
+                    var log = new
+                    {
+                        avant = new { client = _oldClientName, total = _oldTotal },
+                        apres = new { client = c.Name, date = dpInvoiceDate.SelectedDate?.ToString("dd/MM/yyyy"), total = newTotal, nb_lignes = _basket.Count }
+                    };
+                    AuditService.AddLog("UPDATE", "invoices", id, JsonSerializer.Serialize(log));
                 }
 
                 foreach (var l in _basket)
@@ -179,12 +203,21 @@ namespace CRM_lourd.Views
             if (_selectedInvoiceId == null) return;
             if (MessageBox.Show("Supprimer ?", "Confirm", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
             {
+                var client = cbClients.SelectedItem as Client;
                 Database db = new Database();
                 using (var conn = db.GetConnection())
                 {
                     new MySqlCommand($"DELETE FROM invoice_lines WHERE invoice_id={_selectedInvoiceId}", conn).ExecuteNonQuery();
                     new MySqlCommand($"DELETE FROM invoices WHERE id={_selectedInvoiceId}", conn).ExecuteNonQuery();
-                    LoadInvoices(((Client)cbClients.SelectedItem).Id);
+
+                    var log = new
+                    {
+                        avant = new { client = client?.Name, total = _oldTotal },
+                        apres = (object)null
+                    };
+                    AuditService.AddLog("DELETE", "invoices", _selectedInvoiceId, JsonSerializer.Serialize(log));
+
+                    if (client != null) LoadInvoices(client.Id);
                     btnReset_Click(null, null);
                 }
             }
@@ -198,6 +231,8 @@ namespace CRM_lourd.Views
         private void btnReset_Click(object sender, RoutedEventArgs e)
         {
             _selectedInvoiceId = null;
+            _oldTotal = 0;
+            _oldClientName = "";
             _basket.Clear();
             UpdateTotal();
             dpInvoiceDate.SelectedDate = DateTime.Now;

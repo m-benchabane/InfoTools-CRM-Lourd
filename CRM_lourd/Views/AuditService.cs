@@ -17,23 +17,21 @@ namespace CRM_lourd.Views
                     string sql = "INSERT INTO audit_logs (user_id, table_name, row_id, action, changed, created_at) " +
                                  "VALUES (@uid, @table, @rid, @act, @chg, NOW())";
                     MySqlCommand cmd = new MySqlCommand(sql, conn);
-                    var logDetails = new { info = changes ?? "Aucun détail" };
-                    string jsonChanges = JsonSerializer.Serialize(logDetails);
+
+                    // On envoie directement la string JSON sans la re-sérialiser
+                    string jsonChanges = changes ?? "{\"info\":\"Aucun détail\"}";
+
                     cmd.Parameters.AddWithValue("@uid", userId);
                     cmd.Parameters.AddWithValue("@table", tableName);
                     cmd.Parameters.AddWithValue("@rid", rowId ?? (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@act", action);
                     cmd.Parameters.AddWithValue("@chg", jsonChanges);
-
-                    int rows = cmd.ExecuteNonQuery();
-
-                    // DEBUG — à retirer une fois que ça marche
-                    System.Windows.MessageBox.Show($"Audit OK — {rows} ligne(s) insérée(s)\nAction: {action} | Table: {tableName} | ID: {rowId}");
+                    cmd.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show("ERREUR AUDIT : " + ex.Message);
+                System.Windows.MessageBox.Show("Erreur audit : " + ex.Message);
             }
         }
     }

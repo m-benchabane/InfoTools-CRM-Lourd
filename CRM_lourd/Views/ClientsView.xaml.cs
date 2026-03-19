@@ -1,6 +1,7 @@
 ﻿using MySql.Data.MySqlClient;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using CRM_lourd;
@@ -98,7 +99,13 @@ namespace CRM_lourd.Views
                 cmd.ExecuteNonQuery();
 
                 long newId = cmd.LastInsertedId;
-                AuditService.AddLog("INSERT", "customers", newId, $"Ajout contact : {name} ({status})");
+
+                var log = new
+                {
+                    avant = (object)null,
+                    apres = new { nom = name, entreprise = txtCompany.Text, email = txtCustomerEmail.Text, telephone = txtCustomerPhone.Text, ville = txtCity.Text, status = status }
+                };
+                AuditService.AddLog("INSERT", "customers", newId, JsonSerializer.Serialize(log));
 
                 MessageBox.Show("Contact ajouté !");
                 LoadClients();
@@ -139,8 +146,12 @@ namespace CRM_lourd.Views
                 cmd.Parameters.AddWithValue("@id", selected.Id);
                 cmd.ExecuteNonQuery();
 
-                AuditService.AddLog("UPDATE", "customers", selected.Id,
-                    $"Modification contact ID {selected.Id} : {selected.Name} -> {txtCustomerName.Text} ({status})");
+                var log = new
+                {
+                    avant = new { nom = selected.Name, entreprise = selected.CompanyName, email = selected.Email, telephone = selected.Phone, ville = selected.City, status = selected.Status },
+                    apres = new { nom = txtCustomerName.Text, entreprise = txtCompany.Text, email = txtCustomerEmail.Text, telephone = txtCustomerPhone.Text, ville = txtCity.Text, status = status }
+                };
+                AuditService.AddLog("UPDATE", "customers", selected.Id, JsonSerializer.Serialize(log));
 
                 MessageBox.Show("Contact mis à jour !");
                 LoadClients();
@@ -163,8 +174,12 @@ namespace CRM_lourd.Views
                     cmd.Parameters.AddWithValue("@id", selected.Id);
                     cmd.ExecuteNonQuery();
 
-                    AuditService.AddLog("DELETE", "customers", selected.Id,
-                        $"Suppression contact : {selected.Name} ({selected.Status})");
+                    var log = new
+                    {
+                        avant = new { nom = selected.Name, entreprise = selected.CompanyName, email = selected.Email, telephone = selected.Phone, ville = selected.City, status = selected.Status },
+                        apres = (object)null
+                    };
+                    AuditService.AddLog("DELETE", "customers", selected.Id, JsonSerializer.Serialize(log));
 
                     MessageBox.Show("Contact supprimé.");
                     LoadClients();

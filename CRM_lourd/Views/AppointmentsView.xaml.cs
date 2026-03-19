@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using CRM_lourd;
@@ -27,7 +28,6 @@ namespace CRM_lourd.Views
             {
                 using (var conn = db.GetConnection())
                 {
-                    // Prospects ET clients actifs peuvent avoir des RDV
                     string sql = "SELECT * FROM customers WHERE status IN ('actif', 'prospect') ORDER BY name";
                     MySqlCommand cmd = new MySqlCommand(sql, conn);
                     using (MySqlDataReader reader = cmd.ExecuteReader())
@@ -174,16 +174,25 @@ namespace CRM_lourd.Views
             Database db = new Database();
             try
             {
+                long newId;
                 using (var conn = db.GetConnection())
                 {
                     string sql = @"INSERT INTO appointments (customer_id, start_at, subject, created_at)
-                                   VALUES (@clientId, @startAt, @subject, NOW())";
+                                   VALUES (@clientId, @startAt, @subject, NOW());
+                                   SELECT LAST_INSERT_ID();";
                     MySqlCommand cmd = new MySqlCommand(sql, conn);
                     cmd.Parameters.AddWithValue("@clientId", selectedClient.Id);
                     cmd.Parameters.AddWithValue("@startAt", dateTime);
                     cmd.Parameters.AddWithValue("@subject", subject);
-                    cmd.ExecuteNonQuery();
+                    newId = Convert.ToInt64(cmd.ExecuteScalar());
                 }
+
+                var log = new
+                {
+                    avant = (object)null,
+                    apres = new { client = selectedClient.Name, statut_client = selectedClient.Status, date = dateTime.ToString("dd/MM/yyyy HH:mm"), sujet = subject }
+                };
+                AuditService.AddLog("INSERT", "appointments", newId, JsonSerializer.Serialize(log));
 
                 MessageBox.Show("Rendez-vous ajouté avec succès !");
                 LoadAppointments(selectedClient.Id);
@@ -238,6 +247,13 @@ namespace CRM_lourd.Views
                     cmd.ExecuteNonQuery();
                 }
 
+                var log = new
+                {
+                    avant = new { client = selected.ClientName, date = selected.StartAt.ToString("dd/MM/yyyy HH:mm"), sujet = selected.Subject },
+                    apres = new { client = selected.ClientName, date = date.Value.ToString("dd/MM/yyyy HH:mm"), sujet = subject }
+                };
+                AuditService.AddLog("UPDATE", "appointments", selected.Id, JsonSerializer.Serialize(log));
+
                 MessageBox.Show("Rendez-vous mis à jour !");
                 LoadAllAppointmentsByTab();
             }
@@ -263,6 +279,13 @@ namespace CRM_lourd.Views
                         cmd.Parameters.AddWithValue("@id", selected.Id);
                         cmd.ExecuteNonQuery();
                     }
+
+                    var log = new
+                    {
+                        avant = new { client = selected.ClientName, statut_client = selected.ClientStatus, date = selected.StartAt.ToString("dd/MM/yyyy HH:mm"), sujet = selected.Subject },
+                        apres = (object)null
+                    };
+                    AuditService.AddLog("DELETE", "appointments", selected.Id, JsonSerializer.Serialize(log));
 
                     MessageBox.Show("Rendez-vous supprimé !");
                     LoadAllAppointmentsByTab();
