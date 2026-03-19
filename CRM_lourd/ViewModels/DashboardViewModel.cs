@@ -3,7 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
+using System.IO;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using WpfMedia = System.Windows.Media;
@@ -15,12 +16,14 @@ using QuestPDF.Infrastructure;
 
 namespace CRM_lourd.ViewModels
 {
-    // Définition locale du modèle pour éviter l'erreur "Models n'existe pas"
     public class ClientDashboard
     {
         public long Id { get; set; }
         public string Name { get; set; }
         public string Email { get; set; }
+        public string Phone { get; set; }
+
+        public string Initial => !string.IsNullOrEmpty(Name) ? Name.Substring(0, 1).ToUpper() : "?";
     }
 
     public class DashboardViewModel : INotifyPropertyChanged
@@ -32,7 +35,6 @@ namespace CRM_lourd.ViewModels
         private int _monthlyInvoicesCount;
         private int _productsCount;
 
-        // Propriétés avec notification UI
         public int ClientsCount { get => _clientsCount; set { _clientsCount = value; OnPropertyChanged(nameof(ClientsCount)); UpdateChart(); } }
         public int UpcomingAppointmentsCount { get => _upcomingAppointmentsCount; set { _upcomingAppointmentsCount = value; OnPropertyChanged(nameof(UpcomingAppointmentsCount)); UpdateChart(); } }
         public int MonthlyInvoicesCount { get => _monthlyInvoicesCount; set { _monthlyInvoicesCount = value; OnPropertyChanged(nameof(MonthlyInvoicesCount)); UpdateChart(); } }
@@ -50,13 +52,11 @@ namespace CRM_lourd.ViewModels
 
         public DashboardViewModel()
         {
-            // Initialisation QuestPDF
             QuestPDF.Settings.License = LicenseType.Community;
 
             ExportPdfCommand = new RelayCommand(param => ExecuteExportPdf());
             RefreshCommand = new RelayCommand(param => LoadData());
 
-            // Initialisation du graphique avant les données
             StatsLabels = new List<string> { "Clients", "RDV", "Factures", "Produits" };
             StatsSeries = new SeriesCollection();
 
@@ -70,13 +70,16 @@ namespace CRM_lourd.ViewModels
                 Database db = new Database();
                 using (var conn = db.GetConnection())
                 {
-                    ClientsCount = Convert.ToInt32(new MySqlCommand("SELECT COUNT(*) FROM customers", conn).ExecuteScalar());
+                    // KPI — clients actifs uniquement
+                    ClientsCount = Convert.ToInt32(new MySqlCommand("SELECT COUNT(*) FROM customers WHERE status = 'actif'", conn).ExecuteScalar());
                     UpcomingAppointmentsCount = Convert.ToInt32(new MySqlCommand("SELECT COUNT(*) FROM appointments WHERE start_at >= NOW()", conn).ExecuteScalar());
                     MonthlyInvoicesCount = Convert.ToInt32(new MySqlCommand("SELECT COUNT(*) FROM invoices WHERE MONTH(invoiced_at)=MONTH(CURDATE())", conn).ExecuteScalar());
                     ProductsCount = Convert.ToInt32(new MySqlCommand("SELECT COUNT(*) FROM products", conn).ExecuteScalar());
 
+                    // Derniers clients actifs avec téléphone
                     RecentClients.Clear();
-                    using (var reader = new MySqlCommand("SELECT id, name, email FROM customers ORDER BY id DESC LIMIT 5", conn).ExecuteReader())
+                    using (var reader = new MySqlCommand(
+                        "SELECT id, name, email, phone FROM customers WHERE status = 'actif' ORDER BY id DESC LIMIT 5", conn).ExecuteReader())
                     {
                         while (reader.Read())
                         {
@@ -84,78 +87,138 @@ namespace CRM_lourd.ViewModels
                             {
                                 Id = reader.GetInt64(0),
                                 Name = reader.IsDBNull(1) ? "N/A" : reader.GetString(1),
-                                Email = reader.IsDBNull(2) ? "" : reader.GetString(2)
+                                Email = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                                Phone = reader.IsDBNull(3) ? "" : reader.GetString(3)
                             });
                         }
                     }
                 }
                 UpdateChart();
             }
-            catch (Exception ex) { MessageBox.Show("BDD Erreur : " + ex.Message); }
+            catch (Exception ex) { MessageBox.Show("Erreur BDD : " + ex.Message); }
         }
 
         private void UpdateChart()
         {
             var values = new ChartValues<int> { ClientsCount, UpcomingAppointmentsCount, MonthlyInvoicesCount, ProductsCount };
-
             if (StatsSeries.Count == 0)
             {
                 StatsSeries.Add(new ColumnSeries
                 {
-                    Title = "Stats",
+                    Title = "Indicateurs",
                     Values = values,
-                    Fill = new WpfMedia.SolidColorBrush((WpfMedia.Color)WpfMedia.ColorConverter.ConvertFromString("#2563EB"))
+                    Fill = new WpfMedia.SolidColorBrush((WpfMedia.Color)WpfMedia.ColorConverter.ConvertFromString("#1E40AF"))
                 });
             }
-            else
-            {
-                StatsSeries[0].Values = values;
-            }
+            else { StatsSeries[0].Values = values; }
         }
 
         private void ExecuteExportPdf()
         {
             try
             {
-                string fileName = $"Rapport_{DateTime.Now:yyyyMMdd_HHmm}.pdf";
+                string folderPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "InfoTools_Exports");
+                if (!Directory.Exists(folderPath)) Directory.CreateDirectory(folderPath);
 
-                Document.Create(container =>
+                string fileName = $"Rapport_Activite_{DateTime.Now:yyyyMMdd_HHmm}.pdf";
+                string filePath = System.IO.Path.Combine(folderPath, fileName);
+
+                QuestPDF.Fluent.Document.Create(docContainer =>
                 {
-                    container.Page(page =>
+                    docContainer.Page(page =>
                     {
-                        page.Margin(50);
-                        page.Header().Text("TABLEAU DE BORD").FontSize(20).SemiBold().FontColor(Colors.Blue.Medium);
+                        page.Margin(40);
+                        page.Background(QuestPDF.Helpers.Colors.White);
+                        page.DefaultTextStyle(x => x.FontSize(11).FontColor("#1e293b"));
 
-                        page.Content().PaddingVertical(20).Column(col =>
+                        page.Header().Row(row =>
                         {
-                            col.Spacing(15);
+                            row.RelativeItem().Column(col =>
+                            {
+                                col.Item().Text("INFOTOOLS").FontSize(22).ExtraBold().FontColor("#1E40AF");
+                                col.Item().Text("SOLUTION DE GESTION CRM").FontSize(9).SemiBold().FontColor("#64748b");
+                            });
+                            row.RelativeItem().AlignRight().Column(col =>
+                            {
+                                col.Item().Text("RAPPORT ANALYTIQUE").FontSize(14).SemiBold();
+                                col.Item().Text($"{DateTime.Now:dd MMMM yyyy}").FontSize(10);
+                            });
+                        });
+
+                        page.Content().PaddingVertical(25).Column(col =>
+                        {
+                            col.Spacing(20);
+
                             col.Item().Grid(grid =>
                             {
-                                grid.Columns(2);
-                                grid.Spacing(10);
-                                // On utilise le nom complet QuestPDF.Infrastructure.IContainer pour éviter l'erreur CS0104
-                                grid.Item().Element(c => StatBlock(c, "Clients", ClientsCount));
-                                grid.Item().Element(c => StatBlock(c, "RDV", UpcomingAppointmentsCount));
-                                grid.Item().Element(c => StatBlock(c, "Factures", MonthlyInvoicesCount));
-                                grid.Item().Element(c => StatBlock(c, "Produits", ProductsCount));
+                                grid.Columns(4);
+                                grid.Spacing(12);
+                                grid.Item().Element(c => ModernStatCard(c, "CLIENTS ACTIFS", ClientsCount, "#3B82F6"));
+                                grid.Item().Element(c => ModernStatCard(c, "RDV PREVUS", UpcomingAppointmentsCount, "#10B981"));
+                                grid.Item().Element(c => ModernStatCard(c, "FACTURES (MOIS)", MonthlyInvoicesCount, "#F59E0B"));
+                                grid.Item().Element(c => ModernStatCard(c, "CATALOGUE", ProductsCount, "#8B5CF6"));
+                            });
+
+                            col.Item().PaddingTop(10).Column(tableCol =>
+                            {
+                                tableCol.Spacing(8);
+                                tableCol.Item().Text("DERNIERS CLIENTS ACTIFS").FontSize(12).SemiBold().FontColor("#1E40AF");
+                                tableCol.Item().Table(table =>
+                                {
+                                    table.ColumnsDefinition(columns =>
+                                    {
+                                        columns.ConstantColumn(40);
+                                        columns.RelativeColumn();
+                                        columns.RelativeColumn();
+                                        columns.RelativeColumn();
+                                    });
+                                    table.Header(header =>
+                                    {
+                                        header.Cell().BorderBottom(1).BorderColor("#cbd5e1").PaddingVertical(5).Text("ID").SemiBold();
+                                        header.Cell().BorderBottom(1).BorderColor("#cbd5e1").PaddingVertical(5).Text("NOM").SemiBold();
+                                        header.Cell().BorderBottom(1).BorderColor("#cbd5e1").PaddingVertical(5).Text("EMAIL").SemiBold();
+                                        header.Cell().BorderBottom(1).BorderColor("#cbd5e1").PaddingVertical(5).Text("TELEPHONE").SemiBold();
+                                    });
+                                    foreach (var client in RecentClients)
+                                    {
+                                        table.Cell().BorderBottom(1).BorderColor("#f1f5f9").PaddingVertical(5).Text(client.Id.ToString());
+                                        table.Cell().BorderBottom(1).BorderColor("#f1f5f9").PaddingVertical(5).Text(client.Name);
+                                        table.Cell().BorderBottom(1).BorderColor("#f1f5f9").PaddingVertical(5).Text(client.Email);
+                                        table.Cell().BorderBottom(1).BorderColor("#f1f5f9").PaddingVertical(5).Text(client.Phone);
+                                    }
+                                });
+                            });
+                        });
+
+                        page.Footer().AlignCenter().Column(fCol =>
+                        {
+                            fCol.Item().LineHorizontal(1).LineColor("#f1f5f9");
+                            fCol.Item().PaddingTop(5).Text(x =>
+                            {
+                                x.Span("InfoTools CRM - Rapport genere automatiquement - Page ");
+                                x.CurrentPageNumber();
                             });
                         });
                     });
-                }).GeneratePdf(fileName);
+                }).GeneratePdf(filePath);
 
-                MessageBox.Show("PDF généré !");
+                MessageBox.Show($"Export reussi !\nEmplacement : {folderPath}", "Succes", MessageBoxButton.OK, MessageBoxImage.Information);
+                Process.Start("explorer.exe", folderPath);
             }
-            catch (Exception ex) { MessageBox.Show("Erreur PDF : " + ex.Message); }
+            catch (Exception ex) { MessageBox.Show("Erreur export PDF : " + ex.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
-        // Correction de l'erreur CS0104 : On précise explicitement le namespace ici
-        private void StatBlock(QuestPDF.Infrastructure.IContainer container, string title, int val)
+        private void ModernStatCard(QuestPDF.Infrastructure.IContainer container, string title, int val, string accentColor)
         {
-            container.Background(Colors.Grey.Lighten4).Padding(10).Column(c =>
-            {
-                c.Item().Text(title).FontSize(10);
-                c.Item().Text(val.ToString()).FontSize(16).Bold();
-            });
+            container
+                .BorderLeft(3).BorderColor(accentColor)
+                .Background("#f8fafc")
+                .Padding(12)
+                .Column(c =>
+                {
+                    c.Item().Text(title).FontSize(8).SemiBold().FontColor("#64748b");
+                    c.Item().PaddingTop(2).Text(val.ToString()).FontSize(22).ExtraBold().FontColor(QuestPDF.Helpers.Colors.Black);
+                });
         }
 
         protected void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

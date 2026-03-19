@@ -22,22 +22,18 @@ namespace CRM_lourd.Views
 
         private void LoadInitialData()
         {
-            try
-            {
-                LoadClients();
-                LoadProducts();
-            }
+            try { LoadClients(); LoadProducts(); }
             catch (Exception ex) { MessageBox.Show("Erreur : " + ex.Message); }
         }
 
-        #region Chargement Données
         private void LoadClients()
         {
             var list = new List<Client>();
             Database db = new Database();
             using (var conn = db.GetConnection())
             {
-                var r = new MySqlCommand("SELECT id, name FROM customers", conn).ExecuteReader();
+                // Uniquement les clients actifs — pas de facture pour les prospects
+                var r = new MySqlCommand("SELECT id, name FROM customers WHERE status = 'actif'", conn).ExecuteReader();
                 while (r.Read()) list.Add(new Client { Id = r.GetInt64(0), Name = r.GetString(1) });
             }
             cbClients.ItemsSource = list;
@@ -68,9 +64,7 @@ namespace CRM_lourd.Views
             }
             dgInvoices.ItemsSource = list;
         }
-        #endregion
 
-        #region Logique Panier
         private void btnAddLine_Click(object sender, RoutedEventArgs e)
         {
             if (cbProducts.SelectedItem is Product p && int.TryParse(txtQty.Text, out int qty))
@@ -91,9 +85,7 @@ namespace CRM_lourd.Views
         {
             txtInvoiceTotal.Text = _basket.Sum(x => x.LineTotal).ToString("N2") + " €";
         }
-        #endregion
 
-        #region Sélection & Chargement pour Edition
         private void dgInvoices_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (dgInvoices.SelectedItem is Invoice inv)
@@ -101,7 +93,6 @@ namespace CRM_lourd.Views
                 _selectedInvoiceId = inv.Id;
                 dpInvoiceDate.SelectedDate = inv.InvoicedAt;
 
-                // Charger le panier pour modification
                 _basket.Clear();
                 var items = new List<Invoice_lines>();
                 Database db = new Database();
@@ -128,18 +119,12 @@ namespace CRM_lourd.Views
                 UpdateTotal();
             }
         }
-        #endregion
 
-        #region CRUD Operations
-        private void btnAddInvoice_Click(object sender, RoutedEventArgs e)
-        {
-            SaveInvoice(null); // Mode Création
-        }
-
+        private void btnAddInvoice_Click(object sender, RoutedEventArgs e) => SaveInvoice(null);
         private void btnUpdateInvoice_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedInvoiceId == null) return;
-            SaveInvoice(_selectedInvoiceId); // Mode Mise à jour
+            SaveInvoice(_selectedInvoiceId);
         }
 
         private void SaveInvoice(long? existingId)
@@ -183,6 +168,7 @@ namespace CRM_lourd.Views
                     cmdL.Parameters.AddWithValue("@lt", l.LineTotal);
                     cmdL.ExecuteNonQuery();
                 }
+
                 MessageBox.Show("Opération réussie !");
                 LoadInvoices(c.Id);
             }
@@ -203,7 +189,6 @@ namespace CRM_lourd.Views
                 }
             }
         }
-        #endregion
 
         private void cbClients_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {

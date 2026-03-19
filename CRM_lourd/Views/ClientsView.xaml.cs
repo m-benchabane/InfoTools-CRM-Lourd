@@ -15,20 +15,14 @@ namespace CRM_lourd.Views
             LoadClients();
         }
 
-        // 1. CHARGEMENT DES CLIENTS
         private void LoadClients()
         {
             List<Client> clients = new List<Client>();
             Database db = new Database();
-
             try
             {
                 var conn = db.GetConnection();
-                string sql = "SELECT * FROM customers ORDER BY created_at DESC";
-
-                MySqlCommand cmd = new MySqlCommand(sql, conn);
-                MySqlDataReader reader = cmd.ExecuteReader();
-
+                MySqlDataReader reader = new MySqlCommand("SELECT * FROM customers ORDER BY created_at DESC", conn).ExecuteReader();
                 while (reader.Read())
                 {
                     clients.Add(new Client()
@@ -47,13 +41,9 @@ namespace CRM_lourd.Views
                 reader.Close();
                 dgCustomers.ItemsSource = clients;
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Erreur de chargement : " + ex.Message);
-            }
+            catch (Exception ex) { MessageBox.Show("Erreur de chargement : " + ex.Message); }
         }
 
-        // 2. REMPLISSAGE DU FORMULAIRE AU CLIC
         private void dgCustomers_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (dgCustomers.SelectedItem is Client selected)
@@ -80,21 +70,14 @@ namespace CRM_lourd.Views
             }
         }
 
-        // 3. AJOUTER
         private void btnAddCustomer_Click(object sender, RoutedEventArgs e)
         {
             string name = txtCustomerName.Text;
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                MessageBox.Show("Le nom est obligatoire.");
-                return;
-            }
+            if (string.IsNullOrWhiteSpace(name)) { MessageBox.Show("Le nom est obligatoire."); return; }
 
             string status = "prospect";
-            if (cbStatus.SelectedItem is ComboBoxItem selectedItem && selectedItem.Content != null)
-            {
-                status = selectedItem.Content.ToString();
-            }
+            if (cbStatus.SelectedItem is ComboBoxItem si && si.Content != null)
+                status = si.Content.ToString();
 
             Database db = new Database();
             try
@@ -102,9 +85,7 @@ namespace CRM_lourd.Views
                 var conn = db.GetConnection();
                 string sql = @"INSERT INTO customers 
                                (name, company_name, email, phone, address, city, postal_code, status, created_at) 
-                               VALUES 
-                               (@name, @company, @email, @phone, @address, @city, @zip, @status, NOW())";
-
+                               VALUES (@name, @company, @email, @phone, @address, @city, @zip, @status, NOW())";
                 MySqlCommand cmd = new MySqlCommand(sql, conn);
                 cmd.Parameters.AddWithValue("@name", name);
                 cmd.Parameters.AddWithValue("@company", txtCompany.Text);
@@ -114,103 +95,82 @@ namespace CRM_lourd.Views
                 cmd.Parameters.AddWithValue("@city", txtCity.Text);
                 cmd.Parameters.AddWithValue("@zip", txtZip.Text);
                 cmd.Parameters.AddWithValue("@status", status);
-
                 cmd.ExecuteNonQuery();
 
-                // LOG D'AUDIT : AJOUT
                 long newId = cmd.LastInsertedId;
-                AuditService.AddLog("INSERT", "customers", newId, $"Ajout du client : {name} ({status})");
+                AuditService.AddLog("INSERT", "customers", newId, $"Ajout contact : {name} ({status})");
 
-                MessageBox.Show("Client ajouté !");
+                MessageBox.Show("Contact ajouté !");
                 LoadClients();
                 ClearForm();
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Erreur SQL : " + ex.Message);
-            }
+            catch (Exception ex) { MessageBox.Show("Erreur SQL : " + ex.Message); }
         }
 
-        // 4. MODIFIER
         private void btnUpdateCustomer_Click(object sender, RoutedEventArgs e)
         {
-            if (dgCustomers.SelectedItem is Client selected)
+            if (!(dgCustomers.SelectedItem is Client selected))
             {
-                string status = "prospect";
-                if (cbStatus.SelectedItem is ComboBoxItem selectedItem && selectedItem.Content != null)
-                {
-                    status = selectedItem.Content.ToString();
-                }
+                MessageBox.Show("Veuillez sélectionner un contact.");
+                return;
+            }
 
+            string status = "prospect";
+            if (cbStatus.SelectedItem is ComboBoxItem si && si.Content != null)
+                status = si.Content.ToString();
+
+            Database db = new Database();
+            try
+            {
+                var conn = db.GetConnection();
+                string sql = @"UPDATE customers SET 
+                               name=@name, company_name=@company, email=@email, phone=@phone, 
+                               address=@address, city=@city, postal_code=@zip, status=@status, 
+                               updated_at=NOW() WHERE id=@id";
+                MySqlCommand cmd = new MySqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@name", txtCustomerName.Text);
+                cmd.Parameters.AddWithValue("@company", txtCompany.Text);
+                cmd.Parameters.AddWithValue("@email", txtCustomerEmail.Text);
+                cmd.Parameters.AddWithValue("@phone", txtCustomerPhone.Text);
+                cmd.Parameters.AddWithValue("@address", txtAddress.Text);
+                cmd.Parameters.AddWithValue("@city", txtCity.Text);
+                cmd.Parameters.AddWithValue("@zip", txtZip.Text);
+                cmd.Parameters.AddWithValue("@status", status);
+                cmd.Parameters.AddWithValue("@id", selected.Id);
+                cmd.ExecuteNonQuery();
+
+                AuditService.AddLog("UPDATE", "customers", selected.Id,
+                    $"Modification contact ID {selected.Id} : {selected.Name} -> {txtCustomerName.Text} ({status})");
+
+                MessageBox.Show("Contact mis à jour !");
+                LoadClients();
+                ClearForm();
+            }
+            catch (Exception ex) { MessageBox.Show("Erreur SQL : " + ex.Message); }
+        }
+
+        private void btnDeleteCustomer_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(dgCustomers.SelectedItem is Client selected)) return;
+
+            if (MessageBox.Show("Supprimer ce contact ?", "Confirmation", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            {
                 Database db = new Database();
                 try
                 {
                     var conn = db.GetConnection();
-                    string sql = @"UPDATE customers SET 
-                                   name=@name, company_name=@company, email=@email, phone=@phone, 
-                                   address=@address, city=@city, postal_code=@zip, status=@status, 
-                                   updated_at=NOW() 
-                                   WHERE id=@id";
-
-                    MySqlCommand cmd = new MySqlCommand(sql, conn);
-                    cmd.Parameters.AddWithValue("@name", txtCustomerName.Text);
-                    cmd.Parameters.AddWithValue("@company", txtCompany.Text);
-                    cmd.Parameters.AddWithValue("@email", txtCustomerEmail.Text);
-                    cmd.Parameters.AddWithValue("@phone", txtCustomerPhone.Text);
-                    cmd.Parameters.AddWithValue("@address", txtAddress.Text);
-                    cmd.Parameters.AddWithValue("@city", txtCity.Text);
-                    cmd.Parameters.AddWithValue("@zip", txtZip.Text);
-                    cmd.Parameters.AddWithValue("@status", status);
+                    MySqlCommand cmd = new MySqlCommand("DELETE FROM customers WHERE id=@id", conn);
                     cmd.Parameters.AddWithValue("@id", selected.Id);
-
                     cmd.ExecuteNonQuery();
 
-                    // LOG D'AUDIT : MODIFICATION
-                    AuditService.AddLog("UPDATE", "customers", selected.Id, $"Modification du client ID {selected.Id} : {txtCustomerName.Text}");
+                    AuditService.AddLog("DELETE", "customers", selected.Id,
+                        $"Suppression contact : {selected.Name} ({selected.Status})");
 
-                    MessageBox.Show("Client mis à jour !");
+                    MessageBox.Show("Contact supprimé.");
                     LoadClients();
                     ClearForm();
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Erreur SQL : " + ex.Message);
-                }
-            }
-            else
-            {
-                MessageBox.Show("Veuillez sélectionner un client.");
-            }
-        }
-
-        // 5. SUPPRIMER
-        private void btnDeleteCustomer_Click(object sender, RoutedEventArgs e)
-        {
-            if (dgCustomers.SelectedItem is Client selected)
-            {
-                if (MessageBox.Show("Supprimer ce client ?", "Confirmation", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
-                {
-                    Database db = new Database();
-                    try
-                    {
-                        var conn = db.GetConnection();
-                        string sql = "DELETE FROM customers WHERE id=@id";
-                        MySqlCommand cmd = new MySqlCommand(sql, conn);
-                        cmd.Parameters.AddWithValue("@id", selected.Id);
-                        cmd.ExecuteNonQuery();
-
-                        // LOG D'AUDIT : SUPPRESSION
-                        AuditService.AddLog("DELETE", "customers", selected.Id, $"Suppression du client : {selected.Name}");
-
-                        MessageBox.Show("Client supprimé.");
-                        LoadClients();
-                        ClearForm();
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Erreur SQL : " + ex.Message);
-                    }
-                }
+                catch (Exception ex) { MessageBox.Show("Erreur SQL : " + ex.Message); }
             }
         }
 
