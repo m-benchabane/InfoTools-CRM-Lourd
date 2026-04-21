@@ -9,6 +9,13 @@ using CRM_lourd;
 
 namespace CRM_lourd.Views
 {
+    // Petit modèle interne pour les commerciaux
+    public class Commercial
+    {
+        public long Id { get; set; }
+        public string Name { get; set; }
+    }
+
     public partial class AppointmentsView : UserControl
     {
         private string _currentTab = "actif";
@@ -18,8 +25,64 @@ namespace CRM_lourd.Views
         {
             InitializeComponent();
             LoadClients();
+
+            // Afficher le sélecteur de commercial uniquement pour les Managers
+            if (Session.IsManager)
+            {
+                pnlCommercial.Visibility = Visibility.Visible;
+                LoadCommerciaux();
+            }
+            else
+            {
+                pnlCommercial.Visibility = Visibility.Collapsed;
+            }
+
+            LoadAllAppointmentsByTab();
         }
 
+        // ─────────────────────────────────────────────────
+        //  CHARGEMENT COMMERCIAUX (Manager uniquement)
+        // ─────────────────────────────────────────────────
+        private void LoadCommerciaux()
+        {
+            var commerciaux = new List<Commercial>();
+            Database db = new Database();
+            try
+            {
+                using (var conn = db.GetConnection())
+                {
+                    // Charge tous les utilisateurs (Manager + Commercial)
+                    // Adaptez le filtre WHERE si vous ne voulez que les Commerciaux
+                    string sql = "SELECT id, name FROM users ORDER BY name";
+                    MySqlCommand cmd = new MySqlCommand(sql, conn);
+                    using (MySqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            commerciaux.Add(new Commercial
+                            {
+                                Id = reader.GetInt64("id"),
+                                Name = reader["name"] != DBNull.Value ? reader["name"].ToString() : "(sans nom)"
+                            });
+                        }
+                    }
+                }
+                cbCommerciaux.ItemsSource = commerciaux;
+                cbCommerciaux.DisplayMemberPath = "Name";
+
+                // Pré-sélectionner le Manager connecté par défaut
+                var self = commerciaux.FirstOrDefault(c => c.Id == Session.UserId);
+                if (self != null) cbCommerciaux.SelectedItem = self;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Erreur chargement commerciaux : " + ex.Message);
+            }
+        }
+
+        // ─────────────────────────────────────────────────
+        //  CHARGEMENT CLIENTS
+        // ─────────────────────────────────────────────────
         private void LoadClients()
         {
             var clients = new List<Client>();
@@ -51,6 +114,9 @@ namespace CRM_lourd.Views
             catch (Exception ex) { MessageBox.Show("Erreur chargement clients : " + ex.Message); }
         }
 
+        // ─────────────────────────────────────────────────
+        //  CHARGEMENT RDV (par client)
+        // ─────────────────────────────────────────────────
         private void LoadAppointments(long clientId)
         {
             _allAppointments = new List<Appointment>();
@@ -59,10 +125,14 @@ namespace CRM_lourd.Views
             {
                 using (var conn = db.GetConnection())
                 {
-                    string sql = @"SELECT a.id, a.customer_id, c.name AS ClientName,
-                                          c.status AS ClientStatus, a.start_at, a.subject
+                    string sql = @"SELECT a.id, a.customer_id, a.user_id,
+                                          c.name  AS ClientName,
+                                          c.status AS ClientStatus,
+                                          a.start_at, a.subject,
+                                          u.name  AS CommercialName
                                    FROM appointments a
                                    JOIN customers c ON a.customer_id = c.id
+                                   LEFT JOIN users u ON a.user_id = u.id
                                    WHERE a.customer_id = @clientId
                                    ORDER BY a.start_at DESC";
                     MySqlCommand cmd = new MySqlCommand(sql, conn);
@@ -75,8 +145,10 @@ namespace CRM_lourd.Views
                             {
                                 Id = reader.GetInt64("id"),
                                 ClientId = reader.GetInt64("customer_id"),
+                                CommercialId = reader["user_id"] != DBNull.Value ? reader.GetInt64("user_id") : (long?)null,
                                 ClientName = reader["ClientName"] != DBNull.Value ? reader["ClientName"].ToString() : "",
                                 ClientStatus = reader["ClientStatus"] != DBNull.Value ? reader["ClientStatus"].ToString() : "",
+                                CommercialName = reader["CommercialName"] != DBNull.Value ? reader["CommercialName"].ToString() : "—",
                                 StartAt = Convert.ToDateTime(reader["start_at"]),
                                 Subject = reader["subject"] != DBNull.Value ? reader["subject"].ToString() : ""
                             });
@@ -88,6 +160,9 @@ namespace CRM_lourd.Views
             catch (Exception ex) { MessageBox.Show("Erreur chargement RDV : " + ex.Message); }
         }
 
+        // ─────────────────────────────────────────────────
+        //  CHARGEMENT RDV (par onglet actif/prospect)
+        // ─────────────────────────────────────────────────
         private void LoadAllAppointmentsByTab()
         {
             _allAppointments = new List<Appointment>();
@@ -96,10 +171,14 @@ namespace CRM_lourd.Views
             {
                 using (var conn = db.GetConnection())
                 {
-                    string sql = @"SELECT a.id, a.customer_id, c.name AS ClientName,
-                                          c.status AS ClientStatus, a.start_at, a.subject
+                    string sql = @"SELECT a.id, a.customer_id, a.user_id,
+                                          c.name  AS ClientName,
+                                          c.status AS ClientStatus,
+                                          a.start_at, a.subject,
+                                          u.name  AS CommercialName
                                    FROM appointments a
                                    JOIN customers c ON a.customer_id = c.id
+                                   LEFT JOIN users u ON a.user_id = u.id
                                    WHERE c.status = @status
                                    ORDER BY a.start_at DESC";
                     MySqlCommand cmd = new MySqlCommand(sql, conn);
@@ -112,8 +191,10 @@ namespace CRM_lourd.Views
                             {
                                 Id = reader.GetInt64("id"),
                                 ClientId = reader.GetInt64("customer_id"),
+                                CommercialId = reader["user_id"] != DBNull.Value ? reader.GetInt64("user_id") : (long?)null,
                                 ClientName = reader["ClientName"] != DBNull.Value ? reader["ClientName"].ToString() : "",
                                 ClientStatus = reader["ClientStatus"] != DBNull.Value ? reader["ClientStatus"].ToString() : "",
+                                CommercialName = reader["CommercialName"] != DBNull.Value ? reader["CommercialName"].ToString() : "—",
                                 StartAt = Convert.ToDateTime(reader["start_at"]),
                                 Subject = reader["subject"] != DBNull.Value ? reader["subject"].ToString() : ""
                             });
@@ -130,6 +211,27 @@ namespace CRM_lourd.Views
             dgAppointments.ItemsSource = _allAppointments
                 .Where(a => a.ClientStatus == _currentTab).ToList();
         }
+
+        // ─────────────────────────────────────────────────
+        //  HELPERS
+        // ─────────────────────────────────────────────────
+
+        /// <summary>
+        /// Retourne l'ID du commercial à écrire en BDD.
+        /// Manager → ComboBox cbCommerciaux ; Commercial → Session.UserId
+        /// </summary>
+        private long? GetTargetUserId()
+        {
+            if (Session.IsManager)
+            {
+                return (cbCommerciaux.SelectedItem as Commercial)?.Id;
+            }
+            return Session.UserId;
+        }
+
+        // ─────────────────────────────────────────────────
+        //  ÉVÉNEMENTS UI
+        // ─────────────────────────────────────────────────
 
         private void btnTabClients_Click(object sender, RoutedEventArgs e)
         {
@@ -153,6 +255,12 @@ namespace CRM_lourd.Views
                 LoadAppointments(selectedClient.Id);
         }
 
+        // Événement déclaratif dans le XAML (ne fait rien de spécial, juste pour éviter l'erreur de compilation)
+        private void cbCommerciaux_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
+
+        // ─────────────────────────────────────────────────
+        //  AJOUTER UN RDV
+        // ─────────────────────────────────────────────────
         private void btnAddAppointment_Click(object sender, RoutedEventArgs e)
         {
             if (!(cbClients.SelectedItem is Client selectedClient))
@@ -170,6 +278,15 @@ namespace CRM_lourd.Views
                 return;
             }
 
+            long? targetUserId = GetTargetUserId();
+
+            // Si Manager et aucun commercial sélectionné
+            if (Session.IsManager && targetUserId == null)
+            {
+                MessageBox.Show("Veuillez sélectionner un commercial à assigner.");
+                return;
+            }
+
             DateTime dateTime = date.Value.Date.Add(DateTime.Now.TimeOfDay);
             Database db = new Database();
             try
@@ -177,20 +294,33 @@ namespace CRM_lourd.Views
                 long newId;
                 using (var conn = db.GetConnection())
                 {
-                    string sql = @"INSERT INTO appointments (customer_id, start_at, subject, created_at)
-                                   VALUES (@clientId, @startAt, @subject, NOW());
+                    string sql = @"INSERT INTO appointments (customer_id, user_id, start_at, subject, created_at)
+                                   VALUES (@clientId, @userId, @startAt, @subject, NOW());
                                    SELECT LAST_INSERT_ID();";
                     MySqlCommand cmd = new MySqlCommand(sql, conn);
                     cmd.Parameters.AddWithValue("@clientId", selectedClient.Id);
+                    cmd.Parameters.AddWithValue("@userId", (object)targetUserId ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@startAt", dateTime);
                     cmd.Parameters.AddWithValue("@subject", subject);
                     newId = Convert.ToInt64(cmd.ExecuteScalar());
                 }
 
+                // Récupérer le nom du commercial pour l'audit
+                string commercialName = Session.IsManager
+                    ? (cbCommerciaux.SelectedItem as Commercial)?.Name ?? "—"
+                    : Session.CurrentUser;
+
                 var log = new
                 {
                     avant = (object)null,
-                    apres = new { client = selectedClient.Name, statut_client = selectedClient.Status, date = dateTime.ToString("dd/MM/yyyy HH:mm"), sujet = subject }
+                    apres = new
+                    {
+                        client = selectedClient.Name,
+                        statut_client = selectedClient.Status,
+                        date = dateTime.ToString("dd/MM/yyyy HH:mm"),
+                        sujet = subject,
+                        commercial = commercialName
+                    }
                 };
                 AuditService.AddLog("INSERT", "appointments", newId, JsonSerializer.Serialize(log));
 
@@ -200,6 +330,9 @@ namespace CRM_lourd.Views
             catch (Exception ex) { MessageBox.Show("Erreur ajout RDV : " + ex.Message); }
         }
 
+        // ─────────────────────────────────────────────────
+        //  SÉLECTION DANS LA GRILLE
+        // ─────────────────────────────────────────────────
         private void dgAppointments_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (dgAppointments.SelectedItem is Appointment selectedAppointment)
@@ -212,9 +345,20 @@ namespace CRM_lourd.Views
                     var match = clients.FirstOrDefault(c => c.Id == selectedAppointment.ClientId);
                     if (match != null) cbClients.SelectedItem = match;
                 }
+
+                // Resélectionner le commercial dans le ComboBox (Manager uniquement)
+                if (Session.IsManager && selectedAppointment.CommercialId.HasValue
+                    && cbCommerciaux.ItemsSource is List<Commercial> commerciaux)
+                {
+                    var matchC = commerciaux.FirstOrDefault(c => c.Id == selectedAppointment.CommercialId.Value);
+                    if (matchC != null) cbCommerciaux.SelectedItem = matchC;
+                }
             }
         }
 
+        // ─────────────────────────────────────────────────
+        //  MODIFIER UN RDV
+        // ─────────────────────────────────────────────────
         private void btnUpdateAppointment_Click(object sender, RoutedEventArgs e)
         {
             if (!(dgAppointments.SelectedItem is Appointment selected))
@@ -232,25 +376,33 @@ namespace CRM_lourd.Views
                 return;
             }
 
+            long? targetUserId = GetTargetUserId();
+
             Database db = new Database();
             try
             {
                 using (var conn = db.GetConnection())
                 {
                     string sql = @"UPDATE appointments
-                                   SET start_at=@startAt, subject=@subject, updated_at=NOW()
+                                   SET start_at=@startAt, subject=@subject,
+                                       user_id=@userId, updated_at=NOW()
                                    WHERE id=@id";
                     MySqlCommand cmd = new MySqlCommand(sql, conn);
                     cmd.Parameters.AddWithValue("@startAt", date.Value);
                     cmd.Parameters.AddWithValue("@subject", subject);
+                    cmd.Parameters.AddWithValue("@userId", (object)targetUserId ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@id", selected.Id);
                     cmd.ExecuteNonQuery();
                 }
 
+                string commercialName = Session.IsManager
+                    ? (cbCommerciaux.SelectedItem as Commercial)?.Name ?? "—"
+                    : Session.CurrentUser;
+
                 var log = new
                 {
-                    avant = new { client = selected.ClientName, date = selected.StartAt.ToString("dd/MM/yyyy HH:mm"), sujet = selected.Subject },
-                    apres = new { client = selected.ClientName, date = date.Value.ToString("dd/MM/yyyy HH:mm"), sujet = subject }
+                    avant = new { client = selected.ClientName, date = selected.StartAt.ToString("dd/MM/yyyy HH:mm"), sujet = selected.Subject, commercial = selected.CommercialName },
+                    apres = new { client = selected.ClientName, date = date.Value.ToString("dd/MM/yyyy HH:mm"), sujet = subject, commercial = commercialName }
                 };
                 AuditService.AddLog("UPDATE", "appointments", selected.Id, JsonSerializer.Serialize(log));
 
@@ -260,6 +412,9 @@ namespace CRM_lourd.Views
             catch (Exception ex) { MessageBox.Show("Erreur update RDV : " + ex.Message); }
         }
 
+        // ─────────────────────────────────────────────────
+        //  SUPPRIMER UN RDV
+        // ─────────────────────────────────────────────────
         private void btnDeleteAppointment_Click(object sender, RoutedEventArgs e)
         {
             if (!(dgAppointments.SelectedItem is Appointment selected))
@@ -282,7 +437,7 @@ namespace CRM_lourd.Views
 
                     var log = new
                     {
-                        avant = new { client = selected.ClientName, statut_client = selected.ClientStatus, date = selected.StartAt.ToString("dd/MM/yyyy HH:mm"), sujet = selected.Subject },
+                        avant = new { client = selected.ClientName, statut_client = selected.ClientStatus, date = selected.StartAt.ToString("dd/MM/yyyy HH:mm"), sujet = selected.Subject, commercial = selected.CommercialName },
                         apres = (object)null
                     };
                     AuditService.AddLog("DELETE", "appointments", selected.Id, JsonSerializer.Serialize(log));

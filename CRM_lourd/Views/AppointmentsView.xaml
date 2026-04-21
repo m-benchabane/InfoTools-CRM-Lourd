@@ -307,6 +307,31 @@
                                       SelectionChanged="cbClients_SelectionChanged"/>
                         </StackPanel>
 
+                        <!-- ══ COMMERCIAL (visible uniquement pour Manager/Admin) ══ -->
+                        <StackPanel x:Name="pnlCommercial" Margin="0,0,0,14">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <Path Data="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"
+                                      Fill="{StaticResource PrimaryColor}"
+                                      Width="12" Height="12" Stretch="Uniform"
+                                      VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Text="COMMERCIAL ASSIGNÉ" Style="{StaticResource InputLabel}"
+                                           VerticalAlignment="Center" Margin="0"/>
+                            </StackPanel>
+                            <!-- Fond légèrement teinté pour signaler la zone admin -->
+                            <Border CornerRadius="8" BorderBrush="#BFDBFE" BorderThickness="1"
+                                    Background="#EFF6FF" Padding="2">
+                                <ComboBox x:Name="cbCommerciaux"
+                                          Height="36" Padding="10,8" FontSize="13"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          SelectionChanged="cbCommerciaux_SelectionChanged"/>
+                            </Border>
+                            <TextBlock x:Name="txtCommercialInfo"
+                                       Text="Vous assignez ce RDV en tant que Manager"
+                                       FontSize="11" Foreground="{StaticResource PrimaryColor}"
+                                       Margin="0,4,0,0" FontStyle="Italic"/>
+                        </StackPanel>
+
                         <!-- Date -->
                         <StackPanel Margin="0,0,0,14">
                             <TextBlock Text="Date prévue" Style="{StaticResource InputLabel}"/>
@@ -584,6 +609,18 @@
                                         <Setter Property="TextTrimming"      Value="CharacterEllipsis"/>
                                         <Setter Property="VerticalAlignment" Value="Center"/>
                                         <Setter Property="Foreground"        Value="{StaticResource TextSecondary}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+
+                            <!-- COMMERCIAL (colonne visible pour tous, affiche le nom) -->
+                            <DataGridTextColumn Header="COMMERCIAL" Binding="{Binding CommercialName}" Width="140">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextTrimming"      Value="CharacterEllipsis"/>
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="Foreground"        Value="{StaticResource TextSecondary}"/>
+                                        <Setter Property="FontStyle"         Value="Italic"/>
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
