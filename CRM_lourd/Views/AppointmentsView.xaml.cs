@@ -1,34 +1,38 @@
 ﻿using MySql.Data.MySqlClient;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using CRM_lourd; // Pour accéder à la classe Client et Database
+using CRM_lourd;
 
 namespace CRM_lourd.Views
 {
     public partial class AppointmentsView : UserControl
     {
+        // Onglet actif : "actif" ou "prospect"
+        private string _currentTab = "actif";
+
+        // Liste complète chargée (tous les RDV du contact sélectionné)
+        private List<Appointment> _allAppointments = new List<Appointment>();
+
         public AppointmentsView()
         {
             InitializeComponent();
             LoadClients();
         }
 
-        // CHARGEMENT DES CLIENTS
         private void LoadClients()
         {
-            List<Client> clients = new List<Client>();
+            var clients = new List<Client>();
             Database db = new Database();
 
             try
             {
-                // Le bloc "using" ferme automatiquement la connexion à la fin
                 using (var conn = db.GetConnection())
                 {
-                    // PAS DE conn.Open() ICI ! Elle est déjà ouverte par GetConnection()
-
-                    string sql = "SELECT * FROM customers";
+                    // Prospects ET clients actifs
+                    string sql = "SELECT * FROM customers WHERE status IN ('actif', 'prospect') ORDER BY name";
                     MySqlCommand cmd = new MySqlCommand(sql, conn);
 
                     using (MySqlDataReader reader = cmd.ExecuteReader())
@@ -40,7 +44,8 @@ namespace CRM_lourd.Views
                                 Id = reader.GetInt64("id"),
                                 Name = reader["name"] != DBNull.Value ? reader["name"].ToString() : "",
                                 Email = reader["email"] != DBNull.Value ? reader["email"].ToString() : "",
-                                Phone = reader["phone"] != DBNull.Value ? reader["phone"].ToString() : ""
+                                Phone = reader["phone"] != DBNull.Value ? reader["phone"].ToString() : "",
+                                Status = reader["status"] != DBNull.Value ? reader["status"].ToString() : ""
                             });
                         }
                     }
@@ -55,22 +60,21 @@ namespace CRM_lourd.Views
             }
         }
 
-        // CHARGEMENT DES RENDEZ-VOUS D'UN CLIENT
         private void LoadAppointments(long clientId)
         {
-            List<Appointment> appointments = new List<Appointment>();
+            _allAppointments = new List<Appointment>();
             Database db = new Database();
 
             try
             {
                 using (var conn = db.GetConnection())
                 {
-                    // PAS DE conn.Open() ICI !
-
-                    string sql = @"SELECT a.id, a.customer_id, c.name AS ClientName, a.start_at, a.subject
-                                   FROM appointments a 
-                                   JOIN customers c ON a.customer_id = c.id 
-                                   WHERE a.customer_id = @clientId ORDER BY a.start_at DESC";
+                    string sql = @"SELECT a.id, a.customer_id, c.name AS ClientName, 
+                                          c.status AS ClientStatus, a.start_at, a.subject
+                                   FROM appointments a
+                                   JOIN customers c ON a.customer_id = c.id
+                                   WHERE a.customer_id = @clientId
+                                   ORDER BY a.start_at DESC";
 
                     MySqlCommand cmd = new MySqlCommand(sql, conn);
                     cmd.Parameters.AddWithValue("@clientId", clientId);
@@ -79,11 +83,12 @@ namespace CRM_lourd.Views
                     {
                         while (reader.Read())
                         {
-                            appointments.Add(new Appointment()
+                            _allAppointments.Add(new Appointment()
                             {
                                 Id = reader.GetInt64("id"),
                                 ClientId = reader.GetInt64("customer_id"),
                                 ClientName = reader["ClientName"] != DBNull.Value ? reader["ClientName"].ToString() : "",
+                                ClientStatus = reader["ClientStatus"] != DBNull.Value ? reader["ClientStatus"].ToString() : "",
                                 StartAt = Convert.ToDateTime(reader["start_at"]),
                                 Subject = reader["subject"] != DBNull.Value ? reader["subject"].ToString() : ""
                             });
@@ -91,7 +96,7 @@ namespace CRM_lourd.Views
                     }
                 }
 
-                dgAppointments.ItemsSource = appointments;
+                ApplyTabFilter();
             }
             catch (Exception ex)
             {
@@ -99,55 +104,125 @@ namespace CRM_lourd.Views
             }
         }
 
+        // Charge TOUS les RDV filtrés par onglet (sans dépendre d'un client sélectionné)
+        private void LoadAllAppointmentsByTab()
+        {
+            _allAppointments = new List<Appointment>();
+            Database db = new Database();
+
+            try
+            {
+                using (var conn = db.GetConnection())
+                {
+                    string sql = @"SELECT a.id, a.customer_id, c.name AS ClientName,
+                                          c.status AS ClientStatus, a.start_at, a.subject
+                                   FROM appointments a
+                                   JOIN customers c ON a.customer_id = c.id
+                                   WHERE c.status = @status
+                                   ORDER BY a.start_at DESC";
+
+                    MySqlCommand cmd = new MySqlCommand(sql, conn);
+                    cmd.Parameters.AddWithValue("@status", _currentTab);
+
+                    using (MySqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            _allAppointments.Add(new Appointment()
+                            {
+                                Id = reader.GetInt64("id"),
+                                ClientId = reader.GetInt64("customer_id"),
+                                ClientName = reader["ClientName"] != DBNull.Value ? reader["ClientName"].ToString() : "",
+                                ClientStatus = reader["ClientStatus"] != DBNull.Value ? reader["ClientStatus"].ToString() : "",
+                                StartAt = Convert.ToDateTime(reader["start_at"]),
+                                Subject = reader["subject"] != DBNull.Value ? reader["subject"].ToString() : ""
+                            });
+                        }
+                    }
+                }
+
+                dgAppointments.ItemsSource = _allAppointments;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Erreur chargement RDV : " + ex.Message);
+            }
+        }
+
+        private void ApplyTabFilter()
+        {
+            dgAppointments.ItemsSource = _allAppointments
+                .Where(a => a.ClientStatus == _currentTab)
+                .ToList();
+        }
+
+        // ── Onglets ──────────────────────────────────────────
+
+        private void btnTabClients_Click(object sender, RoutedEventArgs e)
+        {
+            _currentTab = "actif";
+            btnTabClients.Style = (Style)FindResource("TabButtonActive");
+            btnTabProspects.Style = (Style)FindResource("TabButtonInactive");
+            LoadAllAppointmentsByTab();
+        }
+
+        private void btnTabProspects_Click(object sender, RoutedEventArgs e)
+        {
+            _currentTab = "prospect";
+            btnTabProspects.Style = (Style)FindResource("TabButtonActive");
+            btnTabClients.Style = (Style)FindResource("TabButtonInactive");
+            LoadAllAppointmentsByTab();
+        }
+
+        // ── Sélection client dans le formulaire ──────────────
+
         private void cbClients_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (cbClients.SelectedItem is Client selectedClient)
                 LoadAppointments(selectedClient.Id);
         }
 
-        // AJOUTER UN RENDEZ-VOUS
+        // ── CRUD ─────────────────────────────────────────────
+
         private void btnAddAppointment_Click(object sender, RoutedEventArgs e)
         {
-            if (cbClients.SelectedItem is Client selectedClient)
+            if (!(cbClients.SelectedItem is Client selectedClient))
             {
-                DateTime? date = dpAppointmentDate.SelectedDate;
-                string subject = txtAppointmentSubject.Text;
-
-                if (date == null || string.IsNullOrWhiteSpace(subject))
-                {
-                    MessageBox.Show("Veuillez remplir la date et le sujet du rendez-vous.");
-                    return;
-                }
-
-                DateTime dateTime = date.Value.Date.Add(DateTime.Now.TimeOfDay);
-                Database db = new Database();
-
-                try
-                {
-                    using (var conn = db.GetConnection())
-                    {
-                        // PAS DE conn.Open() ICI !
-
-                        string sql = @"INSERT INTO appointments (customer_id, start_at, subject, created_at) 
-                                       VALUES (@clientId, @startAt, @subject, NOW())";
-                        MySqlCommand cmd = new MySqlCommand(sql, conn);
-                        cmd.Parameters.AddWithValue("@clientId", selectedClient.Id);
-                        cmd.Parameters.AddWithValue("@startAt", dateTime);
-                        cmd.Parameters.AddWithValue("@subject", subject);
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    MessageBox.Show("Rendez-vous ajouté avec succès !");
-                    LoadAppointments(selectedClient.Id);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Erreur ajout RDV : " + ex.Message);
-                }
+                MessageBox.Show("Veuillez sélectionner un client ou prospect.");
+                return;
             }
-            else
+
+            DateTime? date = dpAppointmentDate.SelectedDate;
+            string subject = txtAppointmentSubject.Text;
+
+            if (date == null || string.IsNullOrWhiteSpace(subject))
             {
-                MessageBox.Show("Veuillez sélectionner un client.");
+                MessageBox.Show("Veuillez remplir la date et le sujet du rendez-vous.");
+                return;
+            }
+
+            DateTime dateTime = date.Value.Date.Add(DateTime.Now.TimeOfDay);
+            Database db = new Database();
+
+            try
+            {
+                using (var conn = db.GetConnection())
+                {
+                    string sql = @"INSERT INTO appointments (customer_id, start_at, subject, created_at)
+                                   VALUES (@clientId, @startAt, @subject, NOW())";
+                    MySqlCommand cmd = new MySqlCommand(sql, conn);
+                    cmd.Parameters.AddWithValue("@clientId", selectedClient.Id);
+                    cmd.Parameters.AddWithValue("@startAt", dateTime);
+                    cmd.Parameters.AddWithValue("@subject", subject);
+                    cmd.ExecuteNonQuery();
+                }
+
+                MessageBox.Show("Rendez-vous ajouté avec succès !");
+                LoadAppointments(selectedClient.Id);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Erreur ajout RDV : " + ex.Message);
             }
         }
 
@@ -157,86 +232,85 @@ namespace CRM_lourd.Views
             {
                 dpAppointmentDate.SelectedDate = selectedAppointment.StartAt;
                 txtAppointmentSubject.Text = selectedAppointment.Subject;
+
+                // Sélectionne aussi le bon client dans le ComboBox
+                if (cbClients.ItemsSource is List<Client> clients)
+                {
+                    var match = clients.FirstOrDefault(c => c.Id == selectedAppointment.ClientId);
+                    if (match != null) cbClients.SelectedItem = match;
+                }
             }
         }
 
-        // MODIFIER UN RENDEZ-VOUS
         private void btnUpdateAppointment_Click(object sender, RoutedEventArgs e)
         {
-            if (dgAppointments.SelectedItem is Appointment selectedAppointment)
+            if (!(dgAppointments.SelectedItem is Appointment selectedAppointment))
             {
-                DateTime? date = dpAppointmentDate.SelectedDate;
-                string subject = txtAppointmentSubject.Text;
+                MessageBox.Show("Veuillez sélectionner un rendez-vous à modifier.");
+                return;
+            }
 
-                if (date == null || string.IsNullOrWhiteSpace(subject))
+            DateTime? date = dpAppointmentDate.SelectedDate;
+            string subject = txtAppointmentSubject.Text;
+
+            if (date == null || string.IsNullOrWhiteSpace(subject))
+            {
+                MessageBox.Show("Veuillez remplir la date et le sujet.");
+                return;
+            }
+
+            Database db = new Database();
+            try
+            {
+                using (var conn = db.GetConnection())
                 {
-                    MessageBox.Show("Veuillez remplir la date et le sujet.");
-                    return;
+                    string sql = @"UPDATE appointments
+                                   SET start_at=@startAt, subject=@subject, updated_at=NOW()
+                                   WHERE id=@id";
+                    MySqlCommand cmd = new MySqlCommand(sql, conn);
+                    cmd.Parameters.AddWithValue("@startAt", date.Value);
+                    cmd.Parameters.AddWithValue("@subject", subject);
+                    cmd.Parameters.AddWithValue("@id", selectedAppointment.Id);
+                    cmd.ExecuteNonQuery();
                 }
 
+                MessageBox.Show("Rendez-vous mis à jour !");
+                LoadAllAppointmentsByTab();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Erreur update RDV : " + ex.Message);
+            }
+        }
+
+        private void btnDeleteAppointment_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(dgAppointments.SelectedItem is Appointment selectedAppointment))
+            {
+                MessageBox.Show("Veuillez sélectionner un rendez-vous à supprimer.");
+                return;
+            }
+
+            if (MessageBox.Show("Supprimer ce rendez-vous ?", "Confirmation", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            {
                 Database db = new Database();
                 try
                 {
                     using (var conn = db.GetConnection())
                     {
-                        // PAS DE conn.Open() ICI !
-
-                        string sql = @"UPDATE appointments 
-                                       SET start_at=@startAt, subject=@subject, updated_at=NOW() 
-                                       WHERE id=@id";
+                        string sql = "DELETE FROM appointments WHERE id=@id";
                         MySqlCommand cmd = new MySqlCommand(sql, conn);
-                        cmd.Parameters.AddWithValue("@startAt", date.Value);
-                        cmd.Parameters.AddWithValue("@subject", subject);
                         cmd.Parameters.AddWithValue("@id", selectedAppointment.Id);
                         cmd.ExecuteNonQuery();
                     }
 
-                    MessageBox.Show("Rendez-vous mis à jour !");
-                    LoadAppointments(selectedAppointment.ClientId);
+                    MessageBox.Show("Rendez-vous supprimé !");
+                    LoadAllAppointmentsByTab();
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Erreur update RDV : " + ex.Message);
+                    MessageBox.Show("Erreur suppression RDV : " + ex.Message);
                 }
-            }
-            else
-            {
-                MessageBox.Show("Veuillez sélectionner un rendez-vous à modifier.");
-            }
-        }
-
-        // SUPPRIMER UN RENDEZ-VOUS
-        private void btnDeleteAppointment_Click(object sender, RoutedEventArgs e)
-        {
-            if (dgAppointments.SelectedItem is Appointment selectedAppointment)
-            {
-                if (MessageBox.Show("Supprimer ce rendez-vous ?", "Confirmation", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
-                {
-                    Database db = new Database();
-                    try
-                    {
-                        using (var conn = db.GetConnection())
-                        {
-                            // PAS DE conn.Open() ICI !
-
-                            string sql = "DELETE FROM appointments WHERE id=@id";
-                            MySqlCommand cmd = new MySqlCommand(sql, conn);
-                            cmd.Parameters.AddWithValue("@id", selectedAppointment.Id);
-                            cmd.ExecuteNonQuery();
-                        }
-
-                        MessageBox.Show("Rendez-vous supprimé !");
-                        LoadAppointments(selectedAppointment.ClientId);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Erreur suppression RDV : " + ex.Message);
-                    }
-                }
-            }
-            else
-            {
-                MessageBox.Show("Veuillez sélectionner un rendez-vous à supprimer.");
             }
         }
     }

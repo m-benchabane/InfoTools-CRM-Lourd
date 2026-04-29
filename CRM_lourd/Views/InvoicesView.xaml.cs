@@ -37,7 +37,7 @@ namespace CRM_lourd.Views
             Database db = new Database();
             using (var conn = db.GetConnection())
             {
-                var r = new MySqlCommand("SELECT id, name FROM customers", conn).ExecuteReader();
+                var r = new MySqlCommand("SELECT id, name FROM customers WHERE status = 'actif'", conn).ExecuteReader();
                 while (r.Read()) list.Add(new Client { Id = r.GetInt64(0), Name = r.GetString(1) });
             }
             cbClients.ItemsSource = list;
